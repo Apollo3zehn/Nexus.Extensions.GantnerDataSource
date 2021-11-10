@@ -1,0 +1,41 @@
+version: '{build}'
+clone_depth: 1
+
+image:
+  - Ubuntu
+
+branches:
+  only:
+    - master
+    - dev
+
+configuration:
+  - Release
+
+init:
+  - ps: git config --global core.autocrlf true
+  - ps: sudo apt-get update; sudo apt-get install -y apt-transport-https; sudo apt-get install -y dotnet-sdk-6.0
+
+build_script:
+  - ps: dotnet publish -c $Env:CONFIGURATION -o publish /p:Build=$Env:APPVEYOR_BUILD_NUMBER /p:IsFinalBuild=$Env:APPVEYOR_REPO_TAG src/Nexus.Extensions.GantnerDataSource/Nexus.Extensions.GantnerDataSource.csproj
+
+test_script:
+  - ps: dotnet test -c $Env:CONFIGURATION /p:BuildProjectReferences=false
+
+after_build:
+  - ps: tar -C publish -zcvf assets.tar.gz *
+
+artifacts:
+  - path: assets.tar.gz
+
+deploy:
+
+# GitHub (master)
+  - provider: GitHub
+    force_update: true
+    auth_token:
+      secure: Ssl8rHF6345+qU9lhUQlHRx0Ta4e6UXIQM3SEpDpjR4+WcpMJM3TvQ5gUWjwf6jQ
+    artifact: /.*\.tar.gz/
+    on:
+      branch: master
+      APPVEYOR_REPO_TAG: true
