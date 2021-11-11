@@ -3,7 +3,7 @@ using UDBF.NET;
 
 namespace Nexus.Extensions.GantnerDataSource
 {
-    public static class GantnerUtilities
+    internal static class GantnerUtilities
     {
         #region Methods
 

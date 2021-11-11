@@ -4,13 +4,13 @@ using System.Collections.Generic;
 
 namespace Nexus.Extensions.GantnerDataSource
 {
-    public record CatalogDescription()
+    internal record CatalogDescription()
     {
         public ExtendedFileSource[] FileSources { get; init; }
         public Dictionary<string, string>? CustomParameters { get; init; }
     }
 
-    public record ExtendedFileSource : FileSource
+    internal record ExtendedFileSource : FileSource
     {
         public ExtendedFileSource(
             string[] PathSegments,

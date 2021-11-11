@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using UDBF.NET;
@@ -37,8 +38,8 @@ namespace Nexus.Extensions.GantnerDataSource
             if (!File.Exists(configFilePath))
                 throw new Exception($"Configuration file {configFilePath} not found.");
 
-            _config = await JsonSerializerHelper
-                .DeserializeAsync<Dictionary<string, CatalogDescription>>(configFilePath);
+            var jsonString = await File.ReadAllTextAsync(configFilePath, cancellationToken);
+            _config = JsonSerializer.Deserialize<Dictionary<string, CatalogDescription>>(jsonString);
         }
 
         protected override Task<FileSourceProvider> GetFileSourceProviderAsync(CancellationToken cancellationToken)
