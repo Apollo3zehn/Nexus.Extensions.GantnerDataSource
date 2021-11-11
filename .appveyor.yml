@@ -6,7 +6,7 @@ image:
 
 branches:
   only:
-    - master
+    - main
     - dev
 
 configuration:
@@ -23,19 +23,19 @@ test_script:
   - ps: dotnet test -c $Env:CONFIGURATION /p:BuildProjectReferences=false
 
 after_build:
-  - ps: tar -C publish -zcvf assets.tar.gz *
+  - ps: cd publish; tar -zcvf ../assets.tar.gz *; cd -
 
 artifacts:
   - path: assets.tar.gz
 
 deploy:
 
-# GitHub (master)
+# GitHub (main)
   - provider: GitHub
     force_update: true
     auth_token:
-      secure: Ssl8rHF6345+qU9lhUQlHRx0Ta4e6UXIQM3SEpDpjR4+WcpMJM3TvQ5gUWjwf6jQ
+      secure: NLTKPQeVaD26Q599Si3afjQakkSEsNWPbGkcTaww3AyqYu7xRPlByGeKAtu6ruBt
     artifact: /.*\.tar.gz/
     on:
-      branch: master
+      branch: main
       APPVEYOR_REPO_TAG: true
