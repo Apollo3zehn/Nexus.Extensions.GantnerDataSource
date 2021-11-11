@@ -17,13 +17,13 @@ namespace Nexus.Sources.Gantner
     {
         #region Fields
 
-        private Dictionary<string, CatalogDescription> _config;
+        private Dictionary<string, CatalogDescription> _config = null!;
 
         #endregion
 
         #region Properties
 
-        private DataSourceContext Context { get; set; }
+        private DataSourceContext Context { get; set; } = null!;
 
         #endregion
 
@@ -39,18 +39,29 @@ namespace Nexus.Sources.Gantner
                 throw new Exception($"Configuration file {configFilePath} not found.");
 
             var jsonString = await File.ReadAllTextAsync(configFilePath, cancellationToken);
-            _config = JsonSerializer.Deserialize<Dictionary<string, CatalogDescription>>(jsonString);
+            _config = JsonSerializer.Deserialize<Dictionary<string, CatalogDescription>>(jsonString) ?? throw new Exception("config is null");
         }
 
         protected override Task<FileSourceProvider> GetFileSourceProviderAsync(CancellationToken cancellationToken)
         {
-            var all = _config.ToDictionary(
+            var allFileSources = _config.ToDictionary(
                 config => config.Key,
                 config => config.Value.FileSources.Cast<FileSource>().ToArray());
 
-            return Task.FromResult(new FileSourceProvider(
-                All: all,
-                Single: catalogItem => all[catalogItem.Catalog.Id].First()));
+            var fileSourceProvider = new FileSourceProvider(
+                All: allFileSources,
+                Single: catalogItem =>
+                {
+                    var properties = catalogItem.Resource.Properties;
+
+                    if (properties is null)
+                        throw new ArgumentNullException(nameof(properties));
+
+                    return allFileSources[catalogItem.Catalog.Id]
+                        .First(fileSource => ((ExtendedFileSource)fileSource).Name == properties["FileSource"]);
+                });
+
+            return Task.FromResult(fileSourceProvider);
         }
 
         protected override Task<string[]> GetCatalogIdsAsync(CancellationToken cancellationToken)
@@ -101,6 +112,7 @@ namespace Nexus.Sources.Gantner
                         var resource = new ResourceBuilder(id: gantnerVariable.Name)
                             .WithUnit(gantnerVariable.Unit)
                             .WithGroups(fileSource.Name)
+                            .WithProperty("FileSource", fileSource.Name)
                             .AddRepresentation(representation)
                             .Build();
 

@@ -4,11 +4,9 @@ using System.Collections.Generic;
 
 namespace Nexus.Sources.Gantner
 {
-    internal record CatalogDescription()
-    {
-        public ExtendedFileSource[] FileSources { get; init; }
-        public Dictionary<string, string>? CustomParameters { get; init; }
-    }
+    internal record CatalogDescription(
+        ExtendedFileSource[] FileSources,
+        Dictionary<string, string>? CustomParameters = null);
 
     internal record ExtendedFileSource : FileSource
     {
@@ -34,6 +32,6 @@ namespace Nexus.Sources.Gantner
 
         public string[] CatalogSourceFiles { get; init; }
 
-        public Dictionary<string, string> CustomParameters { get; init; }
+        public Dictionary<string, string>? CustomParameters { get; init; }
     }
 }
