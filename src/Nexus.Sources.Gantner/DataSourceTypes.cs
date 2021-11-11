@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Nexus.Extensions.GantnerDataSource
+namespace Nexus.Sources.Gantner
 {
     internal record CatalogDescription()
     {

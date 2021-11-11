@@ -17,7 +17,7 @@ init:
   - ps: sudo apt-get update; sudo apt-get install -y apt-transport-https; sudo apt-get install -y dotnet-sdk-6.0
 
 build_script:
-  - ps: dotnet publish -c $Env:CONFIGURATION -o publish /p:Build=$Env:APPVEYOR_BUILD_NUMBER /p:IsFinalBuild=$Env:APPVEYOR_REPO_TAG src/Nexus.Extensions.GantnerDataSource/Nexus.Extensions.GantnerDataSource.csproj
+  - ps: dotnet publish -c $Env:CONFIGURATION -o publish /p:Build=$Env:APPVEYOR_BUILD_NUMBER /p:IsFinalBuild=$Env:APPVEYOR_REPO_TAG src/Nexus.Sources.Gantner/Nexus.Sources.Gantner.csproj
 
 test_script:
   - ps: dotnet test -c $Env:CONFIGURATION /p:BuildProjectReferences=false
