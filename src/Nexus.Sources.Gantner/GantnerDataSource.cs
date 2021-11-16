@@ -12,7 +12,7 @@ using UDBF.NET;
 
 namespace Nexus.Sources.Gantner
 {
-    [ExtensionIdentification("Gantner", "Gantner", "Provides access to databases with Gantner UDBF files.")]
+    [ExtensionDescription("Provides access to databases with Gantner UDBF files.")]
     public class GantnerDataSource : StructuredFileDataSource
     {
         #region Fields
