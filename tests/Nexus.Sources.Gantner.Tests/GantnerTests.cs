@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Nexus.DataModel;
 using Nexus.Extensibility;
-using Nexus.Sources.Gantner;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Tests
+namespace Nexus.Sources.Tests
 {
     public class GantnerTests
     {

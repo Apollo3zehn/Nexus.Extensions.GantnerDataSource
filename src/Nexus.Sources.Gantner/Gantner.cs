@@ -10,7 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UDBF.NET;
 
-namespace Nexus.Sources.Gantner
+namespace Nexus.Sources
 {
     [ExtensionDescription("Provides access to databases with Gantner UDBF files.")]
     public class Gantner : StructuredFileDataSource

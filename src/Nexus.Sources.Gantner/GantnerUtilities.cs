@@ -1,7 +1,7 @@
 ﻿using Nexus.DataModel;
 using UDBF.NET;
 
-namespace Nexus.Sources.Gantner
+namespace Nexus.Sources
 {
     internal static class GantnerUtilities
     {
