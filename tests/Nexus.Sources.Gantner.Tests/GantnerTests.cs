@@ -12,13 +12,13 @@ using Xunit;
 
 namespace Tests
 {
-    public class GantnerDataSourceTests
+    public class GantnerTests
     {
         [Fact]
         public async Task ProvidesCatalog()
         {
             // arrange
-            var dataSource = new GantnerDataSource() as IDataSource;
+            var dataSource = new Gantner() as IDataSource;
 
             var context = new DataSourceContext(
                 ResourceLocator: new Uri("Database", UriKind.Relative),
@@ -53,7 +53,7 @@ namespace Tests
         public async Task ProvidesDataAvailability()
         {
             // arrange
-            var dataSource = new GantnerDataSource() as IDataSource;
+            var dataSource = new Gantner() as IDataSource;
 
             var context = new DataSourceContext(
                 ResourceLocator: new Uri("Database", UriKind.Relative),
@@ -89,7 +89,7 @@ namespace Tests
         public async Task CanReadFullDay()
         {
             // arrange
-            var dataSource = new GantnerDataSource() as IDataSource;
+            var dataSource = new Gantner() as IDataSource;
 
             var context = new DataSourceContext(
                 ResourceLocator: new Uri("Database", UriKind.Relative),
