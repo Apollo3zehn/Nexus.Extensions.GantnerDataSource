@@ -109,7 +109,9 @@ namespace Nexus.Sources
                             dataType: GantnerUtilities.GetNexusDataTypeFromUdbfDataType(gantnerVariable.DataType),
                             samplePeriod: samplePeriod);
 
-                        var resource = new ResourceBuilder(id: gantnerVariable.Name)
+                        var resourceId = GantnerUtilities.EnforceNamingConvention(gantnerVariable.Name);
+
+                        var resource = new ResourceBuilder(id: resourceId)
                             .WithUnit(gantnerVariable.Unit)
                             .WithGroups(fileSource.Name)
                             .WithProperty("FileSource", fileSource.Name)
@@ -132,32 +134,37 @@ namespace Nexus.Sources
             {
                 using var gantnerFile = new UDBFFile(info.FilePath);
 
-                var gantnerVariable = gantnerFile.Variables.First(current => current.Name == info.CatalogItem.Resource.Id);
-                var gantnerData = gantnerFile.Read<byte>(gantnerVariable);
-                var result = gantnerData.Data.Buffer;
-                var elementSize = info.CatalogItem.Representation.ElementSize;
+                var gantnerVariable = gantnerFile.Variables.First(current =>
+                    GantnerUtilities.EnforceNamingConvention(current.Name) == info.CatalogItem.Resource.Id);
 
-                cancellationToken.ThrowIfCancellationRequested();
-
-                // write data
-                if (result.Length == info.FileLength * elementSize)
+                if (gantnerVariable != null)
                 {
-                    var offset = (int)info.FileOffset * elementSize;
+                    var gantnerData = gantnerFile.Read<byte>(gantnerVariable);
+                    var result = gantnerData.Data.Buffer;
+                    var elementSize = info.CatalogItem.Representation.ElementSize;
 
-                    result
-                        .AsMemory()
-                        .Slice(offset)
-                        .CopyTo(info.Data);
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                    info
-                        .Status
-                        .Span
-                        .Fill(1);
-                }
-                // skip data
-                else
-                {
-                    this.Context.Logger.LogDebug("The actual buffer size does not match the expected size, which indicates an incomplete file");
+                    // write data
+                    if (result.Length == info.FileLength * elementSize)
+                    {
+                        var offset = (int)info.FileOffset * elementSize;
+
+                        result
+                            .AsMemory()
+                            .Slice(offset)
+                            .CopyTo(info.Data);
+
+                        info
+                            .Status
+                            .Span
+                            .Fill(1);
+                    }
+                    // skip data
+                    else
+                    {
+                        this.Context.Logger.LogDebug("The actual buffer size does not match the expected size, which indicates an incomplete file");
+                    }
                 }
             });
         }
