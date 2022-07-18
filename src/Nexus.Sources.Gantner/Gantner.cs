@@ -12,26 +12,32 @@ using UDBF.NET;
 
 namespace Nexus.Sources
 {
-    [ExtensionDescription("Provides access to databases with Gantner UDBF files.")]
+    [ExtensionDescription(
+        "Provides access to databases with Gantner UDBF files.",
+        "https://github.com/Apollo3zehn/nexus-sources-gantner",
+        "https://github.com/Apollo3zehn/nexus-sources-gantner")]
     public class Gantner : StructuredFileDataSource
     {
         #region Fields
 
-        private Dictionary<string, CatalogDescription> _config = null!;
+        private Dictionary<string, CatalogDescription> _config = default!;
 
         #endregion
 
         #region Properties
 
-        private DataSourceContext Context { get; set; } = null!;
+        private DataSourceContext Context { get; set; } = default!;
+
+        private ILogger Logger { get; set; } = default!;
 
         #endregion
 
         #region Methods
 
-        protected override async Task SetContextAsync(DataSourceContext context, CancellationToken cancellationToken)
+        protected override async Task SetContextAsync(DataSourceContext context, ILogger logger, CancellationToken cancellationToken)
         {
             this.Context = context;
+            this.Logger = logger;
 
             var configFilePath = Path.Combine(this.Root, "config.json");
 
@@ -57,8 +63,10 @@ namespace Nexus.Sources
                     if (properties is null)
                         throw new ArgumentNullException(nameof(properties));
 
+                    var fileSourceName = properties.Value.GetProperty("FileSource").GetString();
+
                     return allFileSources[catalogItem.Catalog.Id]
-                        .First(fileSource => ((ExtendedFileSource)fileSource).Name == properties["FileSource"]);
+                        .First(fileSource => ((ExtendedFileSource)fileSource).Name == fileSourceName);
                 });
 
             return Task.FromResult(fileSourceProvider);
@@ -67,7 +75,7 @@ namespace Nexus.Sources
         protected override Task<CatalogRegistration[]> GetCatalogRegistrationsAsync(string path, CancellationToken cancellationToken)
         {
             if (path == "/")
-                return Task.FromResult(_config.Keys.Select(catalogId => new CatalogRegistration(catalogId)).ToArray());
+                return Task.FromResult(_config.Select(entry => new CatalogRegistration(entry.Key, entry.Value.Title)).ToArray());
 
             else
                 return Task.FromResult(new CatalogRegistration[0]);
@@ -125,7 +133,7 @@ namespace Nexus.Sources
                         catalogBuilder.AddResource(resource);
                     }
 
-                    catalog = catalog.Merge(catalogBuilder.Build(), MergeMode.NewWins);
+                    catalog = catalog.Merge(catalogBuilder.Build());
                 }
             }
 
@@ -141,7 +149,7 @@ namespace Nexus.Sources
                 var gantnerVariable = gantnerFile.Variables.First(current =>
                     GantnerUtilities.EnforceNamingConvention(current.Name) == info.CatalogItem.Resource.Id);
 
-                if (gantnerVariable != null)
+                if (gantnerVariable != default)
                 {
                     var gantnerData = gantnerFile.Read<byte>(gantnerVariable);
                     var result = gantnerData.Data.Buffer;
@@ -167,7 +175,7 @@ namespace Nexus.Sources
                     // skip data
                     else
                     {
-                        this.Context.Logger.LogDebug("The actual buffer size does not match the expected size, which indicates an incomplete file");
+                        this.Logger.LogDebug("The actual buffer size does not match the expected size, which indicates an incomplete file");
                     }
                 }
             });
