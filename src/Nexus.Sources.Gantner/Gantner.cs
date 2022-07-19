@@ -3,6 +3,7 @@ using Nexus.DataModel;
 using Nexus.Extensibility;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -18,6 +19,11 @@ namespace Nexus.Sources
         "https://github.com/Apollo3zehn/nexus-sources-gantner")]
     public class Gantner : StructuredFileDataSource
     {
+        record CatalogDescription(
+            string Title,
+            Dictionary<string, FileSource> FileSources, 
+            JsonElement? AdditionalProperties);
+
         #region Fields
 
         private Dictionary<string, CatalogDescription> _config = default!;
@@ -36,10 +42,10 @@ namespace Nexus.Sources
 
         protected override async Task SetContextAsync(DataSourceContext context, ILogger logger, CancellationToken cancellationToken)
         {
-            this.Context = context;
-            this.Logger = logger;
+            Context = context;
+            Logger = logger;
 
-            var configFilePath = Path.Combine(this.Root, "config.json");
+            var configFilePath = Path.Combine(Root, "config.json");
 
             if (!File.Exists(configFilePath))
                 throw new Exception($"Configuration file {configFilePath} not found.");
@@ -48,28 +54,11 @@ namespace Nexus.Sources
             _config = JsonSerializer.Deserialize<Dictionary<string, CatalogDescription>>(jsonString) ?? throw new Exception("config is null");
         }
 
-        protected override Task<FileSourceProvider> GetFileSourceProviderAsync(CancellationToken cancellationToken)
+        protected override Task<Func<string, Dictionary<string, FileSource>>> GetFileSourceProviderAsync(
+            CancellationToken cancellationToken)
         {
-            var allFileSources = _config.ToDictionary(
-                config => config.Key,
-                config => config.Value.FileSources.Cast<FileSource>().ToArray());
-
-            var fileSourceProvider = new FileSourceProvider(
-                All: allFileSources,
-                Single: catalogItem =>
-                {
-                    var properties = catalogItem.Resource.Properties;
-
-                    if (properties is null)
-                        throw new ArgumentNullException(nameof(properties));
-
-                    var fileSourceName = properties.Value.GetProperty("FileSource").GetString();
-
-                    return allFileSources[catalogItem.Catalog.Id]
-                        .First(fileSource => ((ExtendedFileSource)fileSource).Name == fileSourceName);
-                });
-
-            return Task.FromResult(fileSourceProvider);
+            return Task.FromResult<Func<string, Dictionary<string, FileSource>>>(
+                catalogId => _config[catalogId].FileSources);
         }
 
         protected override Task<CatalogRegistration[]> GetCatalogRegistrationsAsync(string path, CancellationToken cancellationToken)
@@ -86,19 +75,21 @@ namespace Nexus.Sources
             var catalogDescription = _config[catalogId];
             var catalog = new ResourceCatalog(id: catalogId);
 
-            foreach (var fileSource in catalogDescription.FileSources)
+            foreach (var (fileSourceId, fileSource) in catalogDescription.FileSources)
             {
                 var filePaths = default(string[]);
+                var catalogSourceFiles = fileSource.AdditionalProperties.GetStringArray("CatalogSourceFiles");
 
-                if (fileSource.CatalogSourceFiles is not null)
+                if (catalogSourceFiles is not null)
                 {
-                    filePaths = fileSource.CatalogSourceFiles
-                        .Select(filePath => Path.Combine(this.Root, filePath))
+                    filePaths = catalogSourceFiles
+                        .Where(filePath => filePath is not null)
+                        .Select(filePath => Path.Combine(Root, filePath!))
                         .ToArray();
                 }
                 else
                 {
-                    if (!this.TryGetFirstFile(fileSource, out var filePath))
+                    if (!TryGetFirstFile(fileSource, out var filePath))
                         continue;
 
                     filePaths = new[] { filePath };
@@ -121,12 +112,13 @@ namespace Nexus.Sources
                             dataType: GantnerUtilities.GetNexusDataTypeFromUdbfDataType(gantnerVariable.DataType),
                             samplePeriod: samplePeriod);
 
-                        var resourceId = GantnerUtilities.EnforceNamingConvention(gantnerVariable.Name);
+                        if (!TryEnforceNamingConvention(gantnerVariable.Name, out var resourceId))
+                            continue;
 
                         var resource = new ResourceBuilder(id: resourceId)
                             .WithUnit(gantnerVariable.Unit)
-                            .WithGroups(fileSource.Name)
-                            .WithProperty("FileSource", fileSource.Name)
+                            .WithGroups(fileSourceId)
+                            .WithProperty(StructuredFileDataSource.FileSourceKey, fileSourceId)
                             .AddRepresentation(representation)
                             .Build();
 
@@ -147,7 +139,8 @@ namespace Nexus.Sources
                 using var gantnerFile = new UDBFFile(info.FilePath);
 
                 var gantnerVariable = gantnerFile.Variables.First(current =>
-                    GantnerUtilities.EnforceNamingConvention(current.Name) == info.CatalogItem.Resource.Id);
+                    TryEnforceNamingConvention(current.Name, out var resourceId) &&
+                    resourceId == info.CatalogItem.Resource.Id);
 
                 if (gantnerVariable != default)
                 {
@@ -175,10 +168,19 @@ namespace Nexus.Sources
                     // skip data
                     else
                     {
-                        this.Logger.LogDebug("The actual buffer size does not match the expected size, which indicates an incomplete file");
+                        Logger.LogDebug("The actual buffer size does not match the expected size, which indicates an incomplete file");
                     }
                 }
             });
+        }
+
+        private bool TryEnforceNamingConvention(string resourceId, [NotNullWhen(returnValue: true)] out string newResourceId)
+        {
+            newResourceId = resourceId;
+            newResourceId = Resource.InvalidIdCharsExpression.Replace(newResourceId, "");
+            newResourceId = Resource.InvalidIdStartCharsExpression.Replace(newResourceId, "");
+
+            return Resource.ValidIdExpression.IsMatch(newResourceId);
         }
 
         #endregion
