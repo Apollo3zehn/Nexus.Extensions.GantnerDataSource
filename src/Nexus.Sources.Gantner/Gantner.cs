@@ -101,7 +101,8 @@ namespace Nexus.Sources
                         var resource = new ResourceBuilder(id: resourceId)
                             .WithUnit(gantnerVariable.Unit)
                             .WithGroups(fileSourceId)
-                            .WithProperty(StructuredFileDataSource.FileSourceKey, fileSourceId)
+                            .WithFileSourceId(fileSourceId)
+                            .WithOriginalName(gantnerVariable.Name)
                             .AddRepresentation(representation)
                             .Build();
 
@@ -120,10 +121,7 @@ namespace Nexus.Sources
             return Task.Run(() =>
             {
                 using var gantnerFile = new UDBFFile(info.FilePath);
-
-                var gantnerVariable = gantnerFile.Variables.First(current =>
-                    TryEnforceNamingConvention(current.Name, out var resourceId) &&
-                    resourceId == info.CatalogItem.Resource.Id);
+                var gantnerVariable = gantnerFile.Variables.First(current => current.Name == info.OriginalName);
 
                 if (gantnerVariable != default)
                 {
