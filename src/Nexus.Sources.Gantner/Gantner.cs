@@ -1,8 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Nexus.DataModel;
 using Nexus.Extensibility;
-using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
 using UDBF.NET;
 
 namespace Nexus.Sources
@@ -15,7 +15,7 @@ namespace Nexus.Sources
     {
         record CatalogDescription(
             string Title,
-            Dictionary<string, FileSource> FileSources, 
+            Dictionary<string, IReadOnlyList<FileSource>> FileSourceGroups, 
             JsonElement? AdditionalProperties);
 
         #region Fields
@@ -37,11 +37,11 @@ namespace Nexus.Sources
             _config = JsonSerializer.Deserialize<Dictionary<string, CatalogDescription>>(jsonString) ?? throw new Exception("config is null");
         }
 
-        protected override Task<Func<string, Dictionary<string, FileSource>>> GetFileSourceProviderAsync(
+        protected override Task<Func<string, Dictionary<string, IReadOnlyList<FileSource>>>> GetFileSourceProviderAsync(
             CancellationToken cancellationToken)
         {
-            return Task.FromResult<Func<string, Dictionary<string, FileSource>>>(
-                catalogId => _config[catalogId].FileSources);
+            return Task.FromResult<Func<string, Dictionary<string, IReadOnlyList<FileSource>>>>(
+                catalogId => _config[catalogId].FileSourceGroups);
         }
 
         protected override Task<CatalogRegistration[]> GetCatalogRegistrationsAsync(string path, CancellationToken cancellationToken)
@@ -50,7 +50,7 @@ namespace Nexus.Sources
                 return Task.FromResult(_config.Select(entry => new CatalogRegistration(entry.Key, entry.Value.Title)).ToArray());
 
             else
-                return Task.FromResult(new CatalogRegistration[0]);
+                return Task.FromResult(Array.Empty<CatalogRegistration>());
         }
 
         protected override Task<ResourceCatalog> GetCatalogAsync(string catalogId, CancellationToken cancellationToken)
@@ -58,58 +58,61 @@ namespace Nexus.Sources
             var catalogDescription = _config[catalogId];
             var catalog = new ResourceCatalog(id: catalogId);
 
-            foreach (var (fileSourceId, fileSource) in catalogDescription.FileSources)
+            foreach (var (fileSourceId, fileSourceGroup) in catalogDescription.FileSourceGroups)
             {
-                var filePaths = default(string[]);
-                var catalogSourceFiles = fileSource.AdditionalProperties?.GetStringArray("CatalogSourceFiles");
-
-                if (catalogSourceFiles is not null)
+                foreach (var fileSource in fileSourceGroup)
                 {
-                    filePaths = catalogSourceFiles
-                        .Where(filePath => filePath is not null)
-                        .Select(filePath => Path.Combine(Root, filePath!))
-                        .ToArray();
-                }
-                else
-                {
-                    if (!TryGetFirstFile(fileSource, out var filePath))
-                        continue;
+                    var filePaths = default(string[]);
+                    var catalogSourceFiles = fileSource.AdditionalProperties?.GetStringArray("CatalogSourceFiles");
 
-                    filePaths = new[] { filePath };
-                }
-
-                cancellationToken.ThrowIfCancellationRequested();
-
-                foreach (var filePath in filePaths)
-                {
-                    var catalogBuilder = new ResourceCatalogBuilder(id: catalogId);
-
-                    using var gantnerFile = new UDBFFile(filePath);
-                    var gantnerVariables = gantnerFile.Variables.Where(x => x.DataDirection == UDBFDataDirection.Input || x.DataDirection == UDBFDataDirection.InputOutput);
-
-                    foreach (var gantnerVariable in gantnerVariables)
+                    if (catalogSourceFiles is not null)
                     {
-                        var samplePeriod = TimeSpan.FromSeconds(1.0 / gantnerFile.SampleRate);
-
-                        var representation = new Representation(
-                            dataType: GantnerUtilities.GetNexusDataTypeFromUdbfDataType(gantnerVariable.DataType),
-                            samplePeriod: samplePeriod);
-
-                        if (!TryEnforceNamingConvention(gantnerVariable.Name, out var resourceId))
+                        filePaths = catalogSourceFiles
+                            .Where(filePath => filePath is not null)
+                            .Select(filePath => Path.Combine(Root, filePath!))
+                            .ToArray();
+                    }
+                    else
+                    {
+                        if (!TryGetFirstFile(fileSource, out var filePath))
                             continue;
 
-                        var resource = new ResourceBuilder(id: resourceId)
-                            .WithUnit(gantnerVariable.Unit)
-                            .WithGroups(fileSourceId)
-                            .WithFileSourceId(fileSourceId)
-                            .WithOriginalName(gantnerVariable.Name)
-                            .AddRepresentation(representation)
-                            .Build();
-
-                        catalogBuilder.AddResource(resource);
+                        filePaths = new[] { filePath };
                     }
 
-                    catalog = catalog.Merge(catalogBuilder.Build());
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    foreach (var filePath in filePaths)
+                    {
+                        var catalogBuilder = new ResourceCatalogBuilder(id: catalogId);
+
+                        using var gantnerFile = new UDBFFile(filePath);
+                        var gantnerVariables = gantnerFile.Variables.Where(x => x.DataDirection == UDBFDataDirection.Input || x.DataDirection == UDBFDataDirection.InputOutput);
+
+                        foreach (var gantnerVariable in gantnerVariables)
+                        {
+                            var samplePeriod = TimeSpan.FromSeconds(1.0 / gantnerFile.SampleRate);
+
+                            var representation = new Representation(
+                                dataType: GantnerUtilities.GetNexusDataTypeFromUdbfDataType(gantnerVariable.DataType),
+                                samplePeriod: samplePeriod);
+
+                            if (!TryEnforceNamingConvention(gantnerVariable.Name, out var resourceId))
+                                continue;
+
+                            var resource = new ResourceBuilder(id: resourceId)
+                                .WithUnit(gantnerVariable.Unit)
+                                .WithGroups(fileSourceId)
+                                .WithFileSourceId(fileSourceId)
+                                .WithOriginalName(gantnerVariable.Name)
+                                .AddRepresentation(representation)
+                                .Build();
+
+                            catalogBuilder.AddResource(resource);
+                        }
+
+                        catalog = catalog.Merge(catalogBuilder.Build());
+                    }
                 }
             }
 
@@ -125,8 +128,8 @@ namespace Nexus.Sources
 
                 if (gantnerVariable != default)
                 {
-                    var gantnerData = gantnerFile.Read<byte>(gantnerVariable);
-                    var result = gantnerData.Data.Buffer;
+                    var (timeStamps, data) = gantnerFile.Read<byte>(gantnerVariable);
+                    var result = data.Buffer;
                     var elementSize = info.CatalogItem.Representation.ElementSize;
 
                     cancellationToken.ThrowIfCancellationRequested();
@@ -153,10 +156,10 @@ namespace Nexus.Sources
                         Logger.LogDebug("The actual buffer size does not match the expected size, which indicates an incomplete file");
                     }
                 }
-            });
+            }, cancellationToken);
         }
 
-        private bool TryEnforceNamingConvention(string resourceId, [NotNullWhen(returnValue: true)] out string newResourceId)
+        private static bool TryEnforceNamingConvention(string resourceId, [NotNullWhen(returnValue: true)] out string newResourceId)
         {
             newResourceId = resourceId;
             newResourceId = Resource.InvalidIdCharsExpression.Replace(newResourceId, "");

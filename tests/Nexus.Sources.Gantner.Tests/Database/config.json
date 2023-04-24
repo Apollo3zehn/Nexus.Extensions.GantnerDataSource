@@ -1,7 +1,7 @@
 {
   "/A/B/C": {
-    "FileSources": {
-      "group-A": {
+    "FileSourceGroups": {
+      "group-A": [{
         "PathSegments": [
           "'group-A'",
           "yyyy-MM"
@@ -9,7 +9,7 @@
         "FileTemplate": "'000__0_'yyyy-MM-dd_HH-mm-ss_000000'.dat'",
         "FilePeriod": "00:10:00",
         "UtcOffset": "00:00:00"
-      }
+      }]
     }
   }
 }
