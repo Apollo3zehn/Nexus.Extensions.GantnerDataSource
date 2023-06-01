@@ -72,8 +72,8 @@ namespace Nexus.Sources.Tests
 
             // assert
             var expected = new SortedDictionary<DateTime, double>(Enumerable.Range(0, 31).ToDictionary(
-                    i => begin.AddDays(i),
-                    i => 0.0))
+                i => begin.AddDays(i),
+                i => 0.0))
             {
                 [begin.AddDays(9)] = 2 / 144.0
             };
