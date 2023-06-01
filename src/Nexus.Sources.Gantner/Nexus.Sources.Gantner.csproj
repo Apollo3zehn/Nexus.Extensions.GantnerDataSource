@@ -10,7 +10,7 @@
     <PackageReference Include="Nexus.Extensibility" Version="2.0.0-beta.8">
       <ExcludeAssets>runtime;native</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="UDBF.NET" Version="2.2.2" />
+    <PackageReference Include="UDBF.NET" Version="2.2.3" />
   </ItemGroup>
 
 </Project>

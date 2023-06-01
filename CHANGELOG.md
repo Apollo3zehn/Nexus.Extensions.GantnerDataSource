@@ -1,3 +1,7 @@
+## v2.0.0-beta.2 - 2023-06-01
+
+Fixes an UDBF file parsing bug.
+
 ## v2.0.0-beta.1 - 2023-04-24
 
 Follow Nexus changes.
