@@ -119,42 +119,45 @@ namespace Nexus.Sources
             return Task.FromResult(catalog);
         }
 
-        protected override Task ReadSingleAsync(ReadInfo info, CancellationToken cancellationToken)
+        protected override Task ReadAsync(ReadInfo info, StructuredFileReadRequest[] readRequests, CancellationToken cancellationToken)
         {
             return Task.Run(() =>
             {
-                using var gantnerFile = new UDBFFile(info.FilePath);
-                var gantnerVariable = gantnerFile.Variables.First(current => current.Name == info.OriginalName);
-
-                if (gantnerVariable != default)
+                foreach (var readRequest in readRequests)
                 {
-                    var (timeStamps, data) = gantnerFile.Read<byte>(gantnerVariable);
-                    var result = data.Buffer;
-                    var elementSize = info.CatalogItem.Representation.ElementSize;
+                    using var gantnerFile = new UDBFFile(info.FilePath);
+                    var gantnerVariable = gantnerFile.Variables.First(current => current.Name == readRequest.OriginalName);
 
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    // write data
-                    if (result.Length == info.FileLength * elementSize)
+                    if (gantnerVariable != default)
                     {
-                        var offset = (int)info.FileOffset * elementSize;
-                        var length = (int)info.FileBlock * elementSize;
+                        var (timeStamps, data) = gantnerFile.Read<byte>(gantnerVariable);
+                        var result = data.Buffer;
+                        var elementSize = readRequest.CatalogItem.Representation.ElementSize;
 
-                        result
-                            .AsMemory()
-                            .Slice(offset, length)
-                            .CopyTo(info.Data);
+                        cancellationToken.ThrowIfCancellationRequested();
 
-                        info
-                            .Status
-                            .Span
-                            .Fill(1);
-                    }
-                    // skip data
-                    else
-                    {
-                        Logger.LogDebug("The actual buffer size does not match the expected size, which indicates an incomplete file");
-                    }
+                        // write data
+                        if (result.Length == info.FileLength * elementSize)
+                        {
+                            var offset = (int)info.FileOffset * elementSize;
+                            var length = (int)info.FileBlock * elementSize;
+
+                            result
+                                .AsMemory()
+                                .Slice(offset, length)
+                                .CopyTo(readRequest.Data);
+
+                            readRequest
+                                .Status
+                                .Span
+                                .Fill(1);
+                        }
+                        // skip data
+                        else
+                        {
+                            Logger.LogDebug("The actual buffer size does not match the expected size, which indicates an incomplete file");
+                        }
+                    }   
                 }
             }, cancellationToken);
         }
