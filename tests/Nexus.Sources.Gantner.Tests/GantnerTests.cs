@@ -4,126 +4,125 @@ using Nexus.Extensibility;
 using System.Runtime.InteropServices;
 using Xunit;
 
-namespace Nexus.Sources.Tests
+namespace Nexus.Sources.Tests;
+
+public class GantnerTests
 {
-    public class GantnerTests
+    [Fact]
+    public async Task ProvidesCatalog()
     {
-        [Fact]
-        public async Task ProvidesCatalog()
+        // arrange
+        var dataSource = new Gantner() as IDataSource;
+
+        var context = new DataSourceContext(
+            ResourceLocator: new Uri("Database", UriKind.Relative),
+            SystemConfiguration: default!,
+            SourceConfiguration: default!,
+            RequestConfiguration: default!);
+
+        await dataSource.SetContextAsync(context, NullLogger.Instance, CancellationToken.None);
+
+        // act
+        var actual = await dataSource.GetCatalogAsync("/A/B/C", CancellationToken.None);
+        var actualIds = actual.Resources!.Select(resource => resource.Id).ToList();
+        var actualUnits = actual.Resources!.Select(resource => resource.Properties?.GetStringValue("unit")).ToList();
+        var actualGroups = actual.Resources!.SelectMany(resource => resource.Properties?.GetStringArray("groups")!).ToList();
+        var (begin, end) = await dataSource.GetTimeRangeAsync("/A/B/C", CancellationToken.None);
+
+        // assert
+        var expectedIds = new List<string>() { "WEA10_ACC_Y", "WEA10_ACC_Z" };
+        var expectedUnits = new List<string>() { " V", " V" };
+        var expectedGroups = new List<string>() { "group-A", "group-A" };
+        var expectedStartDate = new DateTime(2015, 12, 10, 00, 00, 00, DateTimeKind.Utc);
+        var expectedEndDate = new DateTime(2015, 12, 10, 00, 20, 00, DateTimeKind.Utc);
+
+        Assert.True(expectedIds.SequenceEqual(actualIds));
+        Assert.True(expectedUnits.SequenceEqual(actualUnits));
+        Assert.True(expectedGroups.SequenceEqual(actualGroups));
+        Assert.Equal(expectedStartDate, begin);
+        Assert.Equal(expectedEndDate, end);
+    }
+
+    [Fact]
+    public async Task ProvidesDataAvailability()
+    {
+        // arrange
+        var dataSource = new Gantner() as IDataSource;
+
+        var context = new DataSourceContext(
+            ResourceLocator: new Uri("Database", UriKind.Relative),
+            SystemConfiguration: default!,
+            SourceConfiguration: default!,
+            RequestConfiguration: default!);
+
+        await dataSource.SetContextAsync(context, NullLogger.Instance, CancellationToken.None);
+
+        // act
+        var actual = new Dictionary<DateTime, double>();
+        var begin = new DateTime(2015, 12, 1, 0, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(2016, 01, 01, 0, 0, 0, DateTimeKind.Utc);
+
+        var currentBegin = begin;
+
+        while (currentBegin < end)
         {
-            // arrange
-            var dataSource = new Gantner() as IDataSource;
-
-            var context = new DataSourceContext(
-                ResourceLocator: new Uri("Database", UriKind.Relative),
-                SystemConfiguration: default!,
-                SourceConfiguration: default!,
-                RequestConfiguration: default!);
-
-            await dataSource.SetContextAsync(context, NullLogger.Instance, CancellationToken.None);
-
-            // act
-            var actual = await dataSource.GetCatalogAsync("/A/B/C", CancellationToken.None);
-            var actualIds = actual.Resources!.Select(resource => resource.Id).ToList();
-            var actualUnits = actual.Resources!.Select(resource => resource.Properties?.GetStringValue("unit")).ToList();
-            var actualGroups = actual.Resources!.SelectMany(resource => resource.Properties?.GetStringArray("groups")!).ToList();
-            var (begin, end) = await dataSource.GetTimeRangeAsync("/A/B/C", CancellationToken.None);
-
-            // assert
-            var expectedIds = new List<string>() { "WEA10_ACC_Y", "WEA10_ACC_Z" };
-            var expectedUnits = new List<string>() { " V", " V" };
-            var expectedGroups = new List<string>() { "group-A", "group-A" };
-            var expectedStartDate = new DateTime(2015, 12, 10, 00, 00, 00, DateTimeKind.Utc);
-            var expectedEndDate = new DateTime(2015, 12, 10, 00, 20, 00, DateTimeKind.Utc);
-
-            Assert.True(expectedIds.SequenceEqual(actualIds));
-            Assert.True(expectedUnits.SequenceEqual(actualUnits));
-            Assert.True(expectedGroups.SequenceEqual(actualGroups));
-            Assert.Equal(expectedStartDate, begin);
-            Assert.Equal(expectedEndDate, end);
+            actual[currentBegin] = await dataSource.GetAvailabilityAsync("/A/B/C", currentBegin, currentBegin.AddDays(1), CancellationToken.None);
+            currentBegin += TimeSpan.FromDays(1);
         }
 
-        [Fact]
-        public async Task ProvidesDataAvailability()
+        // assert
+        var expected = new SortedDictionary<DateTime, double>(Enumerable.Range(0, 31).ToDictionary(
+            i => begin.AddDays(i),
+            i => 0.0))
         {
-            // arrange
-            var dataSource = new Gantner() as IDataSource;
+            [begin.AddDays(9)] = 2 / 144.0
+        };
 
-            var context = new DataSourceContext(
-                ResourceLocator: new Uri("Database", UriKind.Relative),
-                SystemConfiguration: default!,
-                SourceConfiguration: default!,
-                RequestConfiguration: default!);
+        Assert.True(expected.SequenceEqual(new SortedDictionary<DateTime, double>(actual)));
+    }
 
-            await dataSource.SetContextAsync(context, NullLogger.Instance, CancellationToken.None);
+    [Fact]
+    public async Task CanReadFullDay()
+    {
+        // arrange
+        var dataSource = new Gantner() as IDataSource;
 
-            // act
-            var actual = new Dictionary<DateTime, double>();
-            var begin = new DateTime(2015, 12, 1, 0, 0, 0, DateTimeKind.Utc);
-            var end = new DateTime(2016, 01, 01, 0, 0, 0, DateTimeKind.Utc);
+        var context = new DataSourceContext(
+            ResourceLocator: new Uri("Database", UriKind.Relative),
+            SystemConfiguration: default!,
+            SourceConfiguration: default!,
+            RequestConfiguration: default!);
 
-            var currentBegin = begin;
+        await dataSource.SetContextAsync(context, NullLogger.Instance, CancellationToken.None);
 
-            while (currentBegin < end)
-            {
-                actual[currentBegin] = await dataSource.GetAvailabilityAsync("/A/B/C", currentBegin, currentBegin.AddDays(1), CancellationToken.None);
-                currentBegin += TimeSpan.FromDays(1);
-            }
+        // act
+        var catalog = await dataSource.GetCatalogAsync("/A/B/C", CancellationToken.None);
+        var resource = catalog.Resources![0];
+        var representation = resource.Representations![0];
+        var catalogItem = new CatalogItem(catalog, resource, representation, default);
 
-            // assert
-            var expected = new SortedDictionary<DateTime, double>(Enumerable.Range(0, 31).ToDictionary(
-                i => begin.AddDays(i),
-                i => 0.0))
-            {
-                [begin.AddDays(9)] = 2 / 144.0
-            };
+        var begin = new DateTime(2015, 12, 10, 0, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(2015, 12, 11, 0, 0, 0, DateTimeKind.Utc);
+        var (data, status) = ExtensibilityUtilities.CreateBuffers(representation, begin, end);
 
-            Assert.True(expected.SequenceEqual(new SortedDictionary<DateTime, double>(actual)));
+        var result = new ReadRequest(catalogItem, data, status);
+        await dataSource.ReadAsync(begin, end, [result], default!, new Progress<double>(), CancellationToken.None);
+
+        // assert
+        void DoAssert()
+        {
+            var data = MemoryMarshal.Cast<byte, float>(result.Data.Span);
+
+            Assert.Equal(4.9149, data[0], precision: 4);
+            Assert.Equal(4.9613, data[10], precision: 4);
+            Assert.Equal(5.0681, data[100], precision: 4);
+            Assert.Equal(4.9112, data[1000], precision: 4);
+            Assert.Equal(5.0109, data[10000], precision: 4);
+
+            Assert.Equal(1, result.Status.Span[14999]);
+            Assert.Equal(0, result.Status.Span[30000]);
         }
 
-        [Fact]
-        public async Task CanReadFullDay()
-        {
-            // arrange
-            var dataSource = new Gantner() as IDataSource;
-
-            var context = new DataSourceContext(
-                ResourceLocator: new Uri("Database", UriKind.Relative),
-                SystemConfiguration: default!,
-                SourceConfiguration: default!,
-                RequestConfiguration: default!);
-
-            await dataSource.SetContextAsync(context, NullLogger.Instance, CancellationToken.None);
-
-            // act
-            var catalog = await dataSource.GetCatalogAsync("/A/B/C", CancellationToken.None);
-            var resource = catalog.Resources![0];
-            var representation = resource.Representations![0];
-            var catalogItem = new CatalogItem(catalog, resource, representation, default);
-
-            var begin = new DateTime(2015, 12, 10, 0, 0, 0, DateTimeKind.Utc);
-            var end = new DateTime(2015, 12, 11, 0, 0, 0, DateTimeKind.Utc);
-            var (data, status) = ExtensibilityUtilities.CreateBuffers(representation, begin, end);
-
-            var result = new ReadRequest(catalogItem, data, status);
-            await dataSource.ReadAsync(begin, end, new ReadRequest[] { result }, default!, new Progress<double>(), CancellationToken.None);
-
-            // assert
-            void DoAssert()
-            {
-                var data = MemoryMarshal.Cast<byte, float>(result.Data.Span);
-
-                Assert.Equal(4.9149, data[0], precision: 4);
-                Assert.Equal(4.9613, data[10], precision: 4);
-                Assert.Equal(5.0681, data[100], precision: 4);
-                Assert.Equal(4.9112, data[1000], precision: 4);
-                Assert.Equal(5.0109, data[10000], precision: 4);
-
-                Assert.Equal(1, result.Status.Span[14999]);
-                Assert.Equal(0, result.Status.Span[30000]);
-            }
-
-            DoAssert();
-        }
+        DoAssert();
     }
 }
