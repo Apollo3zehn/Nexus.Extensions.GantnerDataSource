@@ -126,7 +126,9 @@ public class Gantner : StructuredFileDataSource
             foreach (var readRequest in readRequests)
             {
                 using var gantnerFile = new UDBFFile(info.FilePath);
-                var gantnerVariable = gantnerFile.Variables.First(current => current.Name == readRequest.OriginalName);
+                
+                var gantnerVariable = gantnerFile.Variables
+                    .FirstOrDefault(current => current.Name == readRequest.OriginalName);
 
                 if (gantnerVariable != default)
                 {
