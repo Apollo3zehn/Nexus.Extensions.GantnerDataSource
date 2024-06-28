@@ -1,3 +1,7 @@
+## v2.0.0-beta.27 - 2024-06-28
+
+- An exception was thrown when the variable to load from a file did not exist.
+
 ## v2.0.0-beta.26 - 2024-03-16
 
 - Follow Nexus changes.
