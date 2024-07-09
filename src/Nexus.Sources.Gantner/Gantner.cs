@@ -139,26 +139,19 @@ public class Gantner : StructuredFileDataSource
                     cancellationToken.ThrowIfCancellationRequested();
 
                     // write data
-                    if (result.Length == info.FileLength * elementSize)
-                    {
-                        var offset = (int)info.FileOffset * elementSize;
-                        var length = (int)info.FileBlock * elementSize;
+                    var offset = (int)info.FileOffset * elementSize;
+                    var length = Math.Min(result.Length, (int)info.FileBlock * elementSize);
 
-                        result
-                            .AsMemory()
-                            .Slice(offset, length)
-                            .CopyTo(readRequest.Data);
+                    result
+                        .AsMemory()
+                        .Slice(offset, length)
+                        .CopyTo(readRequest.Data);
 
-                        readRequest
-                            .Status
-                            .Span
-                            .Fill(1);
-                    }
-                    // skip data
-                    else
-                    {
-                        Logger.LogDebug("The actual buffer size does not match the expected size, which indicates an incomplete file");
-                    }
+                    readRequest
+                        .Status
+                        .Span
+                        .Slice(0, length / elementSize)
+                        .Fill(1);
                 }
             }
         }, cancellationToken);
