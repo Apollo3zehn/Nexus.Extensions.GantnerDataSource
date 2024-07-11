@@ -1,3 +1,7 @@
+## v2.0.0-beta.29 - 2024-07-11
+
+- Follow Nexus.Source.StructuredFile changes.
+
 ## v2.0.0-beta.28 - 2024-07-09
 
 - Support handling of partially written files.
