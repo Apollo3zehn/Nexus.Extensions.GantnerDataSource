@@ -52,10 +52,9 @@ public class Gantner : StructuredFileDataSource
             return Task.FromResult(Array.Empty<CatalogRegistration>());
     }
 
-    protected override Task<ResourceCatalog> GetCatalogAsync(string catalogId, CancellationToken cancellationToken)
+    protected override Task<ResourceCatalog> EnrichCatalogAsync(ResourceCatalog catalog, CancellationToken cancellationToken)
     {
-        var catalogDescription = _config[catalogId];
-        var catalog = new ResourceCatalog(id: catalogId);
+        var catalogDescription = _config[catalog.Id];
 
         foreach (var (fileSourceId, fileSourceGroup) in catalogDescription.FileSourceGroups)
         {
@@ -83,7 +82,7 @@ public class Gantner : StructuredFileDataSource
 
                 foreach (var filePath in filePaths)
                 {
-                    var catalogBuilder = new ResourceCatalogBuilder(id: catalogId);
+                    var catalogBuilder = new ResourceCatalogBuilder(id: catalog.Id);
 
                     using var gantnerFile = new UDBFFile(filePath);
                     var gantnerVariables = gantnerFile.Variables.Where(x => x.DataDirection == UDBFDataDirection.Input || x.DataDirection == UDBFDataDirection.InputOutput);
@@ -118,7 +117,7 @@ public class Gantner : StructuredFileDataSource
         return Task.FromResult(catalog);
     }
 
-    protected override Task ReadAsync(ReadInfo info, StructuredFileReadRequest[] readRequests, CancellationToken cancellationToken)
+    protected override Task ReadAsync(ReadInfo info, ReadRequest[] readRequests, CancellationToken cancellationToken)
     {
         return Task.Run(() =>
         {
@@ -127,7 +126,7 @@ public class Gantner : StructuredFileDataSource
                 using var gantnerFile = new UDBFFile(info.FilePath);
                 
                 var gantnerVariable = gantnerFile.Variables
-                    .FirstOrDefault(current => current.Name == readRequest.OriginalName);
+                    .FirstOrDefault(current => current.Name == readRequest.OriginalResourceName);
 
                 if (gantnerVariable != default)
                 {
