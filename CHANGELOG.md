@@ -1,4 +1,4 @@
-## v2.0.0-beta.34 - 2024-01-22
+## v2.0.0-beta.34 - 2025-01-22
 
 - Follow Nexus changes.
 
