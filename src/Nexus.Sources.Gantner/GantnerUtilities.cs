@@ -5,8 +5,6 @@ namespace Nexus.Sources;
 
 internal static class GantnerUtilities
 {
-    #region Methods
-
     public static NexusDataType GetNexusDataTypeFromUdbfDataType(UDBFDataType dataType)
     {
         return dataType switch
@@ -30,6 +28,4 @@ internal static class GantnerUtilities
             _ => 0
         };
     }
-
-    #endregion
 }

@@ -1,6 +1,6 @@
 {
-  "/A/B/C": {
-    "FileSourceGroups": {
+  "fileSourceGroupsMap": {
+    "/A/B/C": {
       "group-A": [{
         "PathSegments": [
           "'group-A'",
@@ -8,8 +8,12 @@
         ],
         "FileTemplate": "'000__0_'yyyy-MM-dd_HH-mm-ss_000000'.dat'",
         "FilePeriod": "00:10:00",
-        "UtcOffset": "00:00:00"
+        "UtcOffset": "00:00:00",
+        "additionalSettings": {}
       }]
     }
+  },
+  "additionalSettings": {
+    "titleMap": {}
   }
 }

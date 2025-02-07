@@ -6,66 +6,69 @@ using UDBF.NET;
 
 namespace Nexus.Sources;
 
+/// <summary>
+/// Additional extension-specific settings.
+/// </summary>
+/// <param name="TitleMap">The catalog ID to title map. Add an entry here to specify a custom catalog title.</param>
+public record GantnerSettings(
+    Dictionary<string, string> TitleMap
+);
+
+/// <summary>
+/// Additional file source settings.
+/// </summary>
+/// <param name="CatalogSourceFiles">The source files to populate the catalog with resources.</param>
+public record GantnerAdditionalFileSourceSettings(
+    string[]? CatalogSourceFiles
+);
+
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+
 [ExtensionDescription(
     "Provides access to databases with Gantner UDBF files.",
     "https://github.com/Apollo3zehn/nexus-sources-gantner",
     "https://github.com/Apollo3zehn/nexus-sources-gantner")]
-public class Gantner : StructuredFileDataSource
+public class Gantner : StructuredFileDataSource<GantnerSettings, GantnerAdditionalFileSourceSettings>
 {
-    record CatalogDescription(
-        string Title,
-        Dictionary<string, IReadOnlyList<FileSource>> FileSourceGroups,
-        JsonElement? AdditionalProperties);
-
-    #region Fields
-
-    private Dictionary<string, CatalogDescription> _config = default!;
-
-    #endregion
-
-    #region Methods
-
-    protected override async Task InitializeAsync(CancellationToken cancellationToken)
-    {
-        var configFilePath = Path.Combine(Root, "config.json");
-
-        if (!File.Exists(configFilePath))
-            throw new Exception($"Configuration file {configFilePath} not found.");
-
-        var jsonString = await File.ReadAllTextAsync(configFilePath, cancellationToken);
-        _config = JsonSerializer.Deserialize<Dictionary<string, CatalogDescription>>(jsonString) ?? throw new Exception("config is null");
-    }
-
-    protected override Task<Func<string, Dictionary<string, IReadOnlyList<FileSource>>>> GetFileSourceProviderAsync(
-        CancellationToken cancellationToken)
-    {
-        return Task.FromResult<Func<string, Dictionary<string, IReadOnlyList<FileSource>>>>(
-            catalogId => _config[catalogId].FileSourceGroups);
-    }
-
-    protected override Task<CatalogRegistration[]> GetCatalogRegistrationsAsync(string path, CancellationToken cancellationToken)
+    protected override Task<CatalogRegistration[]> GetCatalogRegistrationsAsync(
+        string path,
+        CancellationToken cancellationToken
+    )
     {
         if (path == "/")
-            return Task.FromResult(_config.Select(entry => new CatalogRegistration(entry.Key, entry.Value.Title)).ToArray());
+        {
+            return Task.FromResult(Context.SourceConfiguration.FileSourceGroupsMap
+                .Select(entry =>
+                    {
+                        Context.SourceConfiguration.AdditionalSettings.TitleMap.TryGetValue(entry.Key, out var title);
+                        return new CatalogRegistration(entry.Key, title);
+                    }
+                ).ToArray());
+        }
 
         else
+        {
             return Task.FromResult(Array.Empty<CatalogRegistration>());
+        }
     }
 
-    protected override Task<ResourceCatalog> EnrichCatalogAsync(ResourceCatalog catalog, CancellationToken cancellationToken)
+    protected override Task<ResourceCatalog> EnrichCatalogAsync(
+        ResourceCatalog catalog,
+        CancellationToken cancellationToken
+    )
     {
-        var catalogDescription = _config[catalog.Id];
+        var fileSourceGroupsMap = Context.SourceConfiguration.FileSourceGroupsMap[catalog.Id];
 
-        foreach (var (fileSourceId, fileSourceGroup) in catalogDescription.FileSourceGroups)
+        foreach (var (fileSourceId, fileSourceGroup) in fileSourceGroupsMap)
         {
             foreach (var fileSource in fileSourceGroup)
             {
+                var additionalSettings = fileSource.AdditionalSettings;
                 var filePaths = default(string[]);
-                var catalogSourceFiles = fileSource.AdditionalProperties?.GetStringArray("CatalogSourceFiles");
 
-                if (catalogSourceFiles is not null)
+                if (additionalSettings.CatalogSourceFiles is not null)
                 {
-                    filePaths = catalogSourceFiles
+                    filePaths = additionalSettings.CatalogSourceFiles
                         .Where(filePath => filePath is not null)
                         .Select(filePath => Path.Combine(Root, filePath!))
                         .ToArray();
@@ -117,7 +120,11 @@ public class Gantner : StructuredFileDataSource
         return Task.FromResult(catalog);
     }
 
-    protected override Task ReadAsync(ReadInfo info, ReadRequest[] readRequests, CancellationToken cancellationToken)
+    protected override Task ReadAsync(
+        ReadInfo<GantnerAdditionalFileSourceSettings> info,
+        ReadRequest[] readRequests,
+        CancellationToken cancellationToken
+    )
     {
         return Task.Run(() =>
         {
@@ -163,6 +170,6 @@ public class Gantner : StructuredFileDataSource
 
         return Resource.ValidIdExpression.IsMatch(newResourceId);
     }
-
-    #endregion
 }
+
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member

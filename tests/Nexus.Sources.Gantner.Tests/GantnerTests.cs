@@ -2,9 +2,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Nexus.DataModel;
 using Nexus.Extensibility;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using Xunit;
 
 namespace Nexus.Sources.Tests;
+
+using MySettings = StructuredFileDataSourceSettings<GantnerSettings, GantnerAdditionalFileSourceSettings>;
 
 public class GantnerTests
 {
@@ -12,13 +15,8 @@ public class GantnerTests
     public async Task ProvidesCatalog()
     {
         // arrange
-        var dataSource = new Gantner() as IDataSource;
-
-        var context = new DataSourceContext(
-            ResourceLocator: new Uri("Database", UriKind.Relative),
-            SystemConfiguration: default!,
-            SourceConfiguration: default!,
-            RequestConfiguration: default!);
+        var dataSource = (IDataSource<MySettings>)new Gantner();
+        var context = BuildContext();
 
         await dataSource.SetContextAsync(context, NullLogger.Instance, CancellationToken.None);
 
@@ -47,13 +45,8 @@ public class GantnerTests
     public async Task ProvidesDataAvailability()
     {
         // arrange
-        var dataSource = new Gantner() as IDataSource;
-
-        var context = new DataSourceContext(
-            ResourceLocator: new Uri("Database", UriKind.Relative),
-            SystemConfiguration: default!,
-            SourceConfiguration: default!,
-            RequestConfiguration: default!);
+        var dataSource = (IDataSource<MySettings>)new Gantner();
+        var context = BuildContext();
 
         await dataSource.SetContextAsync(context, NullLogger.Instance, CancellationToken.None);
 
@@ -85,13 +78,8 @@ public class GantnerTests
     public async Task CanReadFullDay()
     {
         // arrange
-        var dataSource = new Gantner() as IDataSource;
-
-        var context = new DataSourceContext(
-            ResourceLocator: new Uri("Database", UriKind.Relative),
-            SystemConfiguration: default!,
-            SourceConfiguration: default!,
-            RequestConfiguration: default!);
+        var dataSource = (IDataSource<MySettings>)new Gantner();
+        var context = BuildContext();
 
         await dataSource.SetContextAsync(context, NullLogger.Instance, CancellationToken.None);
 
@@ -124,5 +112,24 @@ public class GantnerTests
         }
 
         DoAssert();
+    }
+
+    private static DataSourceContext<MySettings> BuildContext()
+    {
+        var configFilePath = Path.Combine("Database", "config.json");
+
+        if (!File.Exists(configFilePath))
+            throw new Exception($"The configuration file does not exist on path {configFilePath}.");
+
+        var jsonString = File.ReadAllText(configFilePath);
+        var sourceConfiguration = JsonSerializer.Deserialize<MySettings>(jsonString, JsonSerializerOptions.Web)!;
+
+        var context = new DataSourceContext<MySettings>(
+            ResourceLocator: new Uri("Database", UriKind.Relative),
+            SourceConfiguration: sourceConfiguration,
+            RequestConfiguration: default!
+        );
+
+        return context;
     }
 }
